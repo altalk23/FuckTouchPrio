@@ -82,7 +82,10 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
         auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers);
 
-        std::vector<CCObject*> touchesCopy(touches->begin(), touches->end());
+        std::vector<CCObject*> touchesCopy;
+        for (auto touch : *touches) {
+            touchesCopy.push_back(touch);
+        }
 
         for (auto setIter = touchesCopy.begin(); setIter != touchesCopy.end(); ++setIter) {
             auto touch = static_cast<CCTouch*>(*setIter);
