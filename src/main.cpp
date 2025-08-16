@@ -37,32 +37,29 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         // assumes all nodes will converge at the same root
         bool operator<(ParentPath const& other) const {
             if (this->root() != other.root()) {
-                return false; // different roots, cannot compare
+                return this->root() < other.root(); // different roots, cannot compare
             }
 
-            size_t divergeIndex = 0;
-            do {
-                ++divergeIndex;
-
+            size_t maxLength = std::max(path.size(), other.path.size());
+            // nth(1) gives the child of the root, which is fine since we already compared the root
+            for (size_t divergeIndex = 1; divergeIndex < maxLength; ++divergeIndex) {
                 auto thisParent = this->nth(divergeIndex);
                 auto otherParent = other.nth(divergeIndex);
-                if (!thisParent && !otherParent) {
-                    // reached the leaves together without diverging, same node?
-                    return false;
-                }
-                else if (!thisParent) {
+                if (!thisParent && otherParent) {
                     // other is deeper in compared to this, other should come first
                     return false;
                 }
-                else if (!otherParent) {
+                else if (!otherParent && thisParent) {
                     // this is deeper in compared to other, this should come first
                     return true;
                 }
-                if (thisParent != otherParent) {
+                else if (thisParent != otherParent) {
                     // higher Z order should come first
                     return thisParent->getZOrder() > otherParent->getZOrder();
                 }
-            } while (true);
+            }
+            // reached the leaves together without diverging, same node?
+            return false;
         }
     };
 
