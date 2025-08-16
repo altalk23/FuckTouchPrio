@@ -42,17 +42,27 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
 
             size_t divergeIndex = 0;
             do {
+                ++divergeIndex;
+
                 auto thisParent = this->nth(divergeIndex);
                 auto otherParent = other.nth(divergeIndex);
+                if (!thisParent && !otherParent) {
+                    // reached the leaves together without diverging, same node?
+                    return false;
+                }
+                else if (!thisParent) {
+                    // other is deeper in compared to this, other should come first
+                    return false;
+                }
+                else if (!otherParent) {
+                    // this is deeper in compared to other, this should come first
+                    return true;
+                }
                 if (thisParent != otherParent) {
-                    // higher Z order should have bigger priority, therefore smaller
+                    // higher Z order should come first
                     return thisParent->getZOrder() > otherParent->getZOrder();
                 }
-                ++divergeIndex;
-            } while (this->nth(divergeIndex) && other.nth(divergeIndex));
-
-            // could not diverge, same node registered twice?
-            return false;
+            } while (true);
         }
     };
 
