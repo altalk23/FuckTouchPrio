@@ -79,16 +79,18 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         return paths;
     }
 
-    void handleTargetedHandlers(CCSet* touches, CCEvent* event, CCSet* mutableTouches, unsigned int index) {
+    void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
         auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers);
 
-        for (auto setIter = touches->begin(); setIter != touches->end(); ++setIter) {
+        std::vector<CCObject*> touchesCopy(touches->begin(), touches->end());
+
+        for (auto setIter = touchesCopy.begin(); setIter != touchesCopy.end(); ++setIter) {
             auto touch = static_cast<CCTouch*>(*setIter);
 
             for (auto& path : registeredPaths) {
                 auto delegate = path.handler->getDelegate();
-                auto claimedTouches = path.handler->getClaimedTouches();
-                auto swallowsTouches = path.handler->isSwallowsTouches();
+                auto claimedTouches = path.handler->m_pClaimedTouches;
+                auto swallowsTouches = path.handler->m_bSwallowsTouches;
 
                 bool claimed = false;
                 if (index == CCTOUCHBEGAN) {
@@ -119,7 +121,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                 }
 
                 if (claimed && swallowsTouches) {
-                    mutableTouches->removeObject(touch);
+                    touches->removeObject(touch);
 
                     break;
                 }
@@ -127,7 +129,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         }
     }
 
-    void handleStandardHandlers(CCSet* mutableTouches, CCEvent* event, unsigned int index) {
+    void handleStandardHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
         auto registeredPaths = this->getRegisteredPaths<CCStandardTouchHandler>(m_pStandardHandlers);
 
         for (auto& path : registeredPaths) {
@@ -135,16 +137,16 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
 
             switch (m_sHandlerHelperData[index].m_type) {
             case CCTOUCHBEGAN:
-                delegate->ccTouchesBegan(mutableTouches, event);
+                delegate->ccTouchesBegan(touches, event);
                 break;
             case CCTOUCHMOVED:
-                delegate->ccTouchesMoved(mutableTouches, event);
+                delegate->ccTouchesMoved(touches, event);
                 break;
             case CCTOUCHENDED:
-                delegate->ccTouchesEnded(mutableTouches, event);
+                delegate->ccTouchesEnded(touches, event);
                 break;
             case CCTOUCHCANCELLED:
-                delegate->ccTouchesCancelled(mutableTouches, event);
+                delegate->ccTouchesCancelled(touches, event);
                 break;
             }
         }
@@ -153,22 +155,19 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     $override
     void touches(CCSet* touches, CCEvent* event, unsigned int index) {
         m_bLocked = true;
-        auto mutableTouches = touches->mutableCopy();
 
         //
         // process the target handlers 1st
         //
         if (m_pTargetedHandlers->count() > 0) {
-            this->handleTargetedHandlers(touches, event, mutableTouches, index);
+            this->handleTargetedHandlers(touches, event, index);
         }
         //
         // process standard handlers 2nd
         //
-        if (m_pStandardHandlers->count() > 0 && mutableTouches->count() > 0) {
-            this->handleStandardHandlers(mutableTouches, event, index);
+        if (m_pStandardHandlers->count() > 0 && touches->count() > 0) {
+            this->handleStandardHandlers(touches, event, index);
         }
-
-        mutableTouches->release();
 
         //
         // Optimization. To prevent a [handlers copy] which is expensive
@@ -178,7 +177,18 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         if (m_bToRemove) {
             m_bToRemove = false;
             for (unsigned int i = 0; i < m_pHandlersToRemove->num; ++i) {
-                this->forceRemoveDelegate((CCTouchDelegate*)m_pHandlersToRemove->arr[i]);
+                for (auto handler : CCArrayExt<CCTargetedTouchHandler*>(m_pTargetedHandlers)) {
+                    if (handler->getDelegate() == m_pHandlersToRemove->arr[i]) {
+                        m_pTargetedHandlers->removeObject(handler);
+                        break;
+                    }
+                }
+                for (auto handler : CCArrayExt<CCStandardTouchHandler*>(m_pStandardHandlers)) {
+                    if (handler->getDelegate() == m_pHandlersToRemove->arr[i]) {
+                        m_pStandardHandlers->removeObject(handler);
+                        break;
+                    }
+                }
             }
             m_pHandlersToRemove->num = 0;
         }
@@ -191,11 +201,11 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                 handler = (CCTouchHandler*)pObj;
                 if (!handler) break;
 
-                if (typeinfo_cast<CCTargetedTouchHandler*>(handler)) {                
-                    this->forceAddHandler(handler, m_pTargetedHandlers);
+                if (typeinfo_cast<CCTargetedTouchHandler*>(handler)) {
+                    m_pTargetedHandlers->addObject(handler);
                 }
                 else {
-                    this->forceAddHandler(handler, m_pStandardHandlers);
+                    m_pStandardHandlers->addObject(handler);
                 }
             }
     
@@ -204,7 +214,22 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
 
         if (m_bToQuit) {
             m_bToQuit = false;
-            this->forceRemoveAllDelegates();
+            m_pStandardHandlers->removeAllObjects();
+            m_pTargetedHandlers->removeAllObjects();
         }
+    }
+};
+
+#include <Geode/modify/GJBaseGameLayer.hpp>
+
+struct FuckEditorPrio : Modify<FuckEditorPrio, GJBaseGameLayer> {
+    $override
+    bool init() override {
+        if (!GJBaseGameLayer::init()) return false;
+
+        // Nice one robtop
+        if (m_uiLayer) m_uiLayer->setZOrder(2);
+
+        return true;
     }
 };
