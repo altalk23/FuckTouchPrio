@@ -196,11 +196,8 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
 
         if (m_bToAdd) {
             m_bToAdd = false;
-            CCTouchHandler* handler = NULL;
-            CCObject* pObj = NULL;
-            CCARRAY_FOREACH(m_pHandlersToAdd, pObj) {
-                handler = (CCTouchHandler*)pObj;
-                if (!handler) break;
+            for (auto handler : CCArrayExt<CCTouchHandler*>(m_pHandlersToAdd)) {
+                if (!handler) continue;
 
                 if (typeinfo_cast<CCTargetedTouchHandler*>(handler)) {
                     m_pTargetedHandlers->addObject(handler);
