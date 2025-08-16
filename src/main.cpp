@@ -168,7 +168,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         //
         // process standard handlers 2nd
         //
-        if (m_pStandardHandlers->count() > 0 && touches->count() > 0) {
+        if (m_pStandardHandlers->count() > 0 && touches->m_pSet->size() > 0) {
             this->handleStandardHandlers(touches, event, index);
         }
 
