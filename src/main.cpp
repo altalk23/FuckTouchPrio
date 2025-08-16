@@ -235,17 +235,3 @@ struct FuckEditorPrio : Modify<FuckEditorPrio, GJBaseGameLayer> {
         return true;
     }
 };
-
-#include <Geode/modify/LevelEditorLayer.hpp>
-
-struct FuckEditorPrioSequel : Modify<FuckEditorPrioSequel, LevelEditorLayer> {
-    $override
-    bool init(GJGameLevel* p0, bool p1) {
-        if (!LevelEditorLayer::init(p0, p1)) return false;
-
-        // Nice one robtop
-        if (m_editorUI) m_editorUI->setZOrder(3);
-
-        return true;
-    }
-};
