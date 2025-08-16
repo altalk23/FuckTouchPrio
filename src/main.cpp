@@ -82,14 +82,12 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
         auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers);
 
-        std::vector<CCObject*> touchesCopy;
+        std::vector<CCTouch*> touchesCopy;
         for (auto touch : *touches) {
-            touchesCopy.push_back(touch);
+            touchesCopy.push_back(static_cast<CCTouch*>(touch));
         }
 
-        for (auto setIter = touchesCopy.begin(); setIter != touchesCopy.end(); ++setIter) {
-            auto touch = static_cast<CCTouch*>(*setIter);
-
+        for (auto touch : touchesCopy) {
             for (auto& path : registeredPaths) {
                 auto delegate = path.handler->getDelegate();
                 auto claimedTouches = path.handler->m_pClaimedTouches;
@@ -232,6 +230,20 @@ struct FuckEditorPrio : Modify<FuckEditorPrio, GJBaseGameLayer> {
 
         // Nice one robtop
         if (m_uiLayer) m_uiLayer->setZOrder(2);
+
+        return true;
+    }
+};
+
+#include <Geode/modify/LevelEditorLayer.hpp>
+
+struct FuckEditorPrioSequel : Modify<FuckEditorPrioSequel, LevelEditorLayer> {
+    $override
+    bool init(GJGameLevel* p0, bool p1) {
+        if (!LevelEditorLayer::init(p0, p1)) return false;
+
+        // Nice one robtop
+        if (m_editorUI) m_editorUI->setZOrder(3);
 
         return true;
     }
