@@ -55,6 +55,10 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                 }
                 else if (thisParent != otherParent) {
                     // higher Z order should come first
+                    if (thisParent->getZOrder() == otherParent->getZOrder()) {
+                        // same Z order, use order of arrival
+                        return thisParent->getOrderOfArrival() > otherParent->getOrderOfArrival();
+                    }
                     return thisParent->getZOrder() > otherParent->getZOrder();
                 }
             }
