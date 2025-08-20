@@ -10,81 +10,91 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         (void)self.setHookPriority("cocos2d::CCTouchDispatcher::touches", Priority::Replace);
     }
 
-    template <class Handler>
-    struct ParentPath {
-        std::vector<CCNode*> path;
-        Handler* handler = nullptr;
+    template <std::derived_from<CCTouchHandler> Handler>
+    struct HandlerIterable {
+        std::unordered_map<CCNode*, Handler*> handler_map;
+        std::unordered_map<CCNode*, std::vector<CCNode*>> children_map;
+        std::unordered_map<CCNode*, CCNode*> sibling_map;
 
-        ParentPath(CCNode* node, Handler* handler) : handler(handler) {
-            while (node) {
-                path.push_back(node);
-                node = node->getParent();
+        HandlerIterable(CCArrayExt<Handler*> handlers) {
+            for (auto handler : handlers) {
+                if (!handler) continue;
+                auto delegate = handler->getDelegate();
+                if (!delegate) continue;
+                auto node = typeinfo_cast<CCNode*>(delegate);
+                if (!node) continue;
+                addPath(node);
+                // if someone inherits from CCTouchDelegate more than once, it's very much their problem
+                handler_map[node] = handler;
             }
         }
 
-        CCNode* leaf() const {
-            return path.empty() ? nullptr : path.front();
+        // we treat nullptr as the root of roots
+        void addPath(CCNode* node) {
+            if (children_map.contains(node) || handler_map.contains(node) || !node) return;
+            auto parent = node->getParent();
+            addPath(parent);
+            children_map[parent].push_back(node);
         }
 
-        CCNode* root() const {
-            return path.empty() ? nullptr : path.back();
-        }
+        struct iterator {
+            using difference_type = std::ptrdiff_t;
+            using value_type = Handler*;
 
-        CCNode* nth(size_t n) const {
-            return (n < path.size()) ? path[path.size() - 1 - n] : nullptr;
-        }
+            CCNode* node{nullptr};
+            HandlerIterable* iterable;
 
-        // assumes all nodes will converge at the same root
-        bool operator<(ParentPath const& other) const {
-            if (this->root() != other.root()) {
-                return this->root() < other.root(); // different roots, cannot compare
+            iterator(HandlerIterable* iterable) : iterable{iterable} {
+                goDown();
             }
 
-            size_t maxLength = std::max(path.size(), other.path.size());
-            // nth(1) gives the child of the root, which is fine since we already compared the root
-            for (size_t divergeIndex = 1; divergeIndex < maxLength; ++divergeIndex) {
-                auto thisParent = this->nth(divergeIndex);
-                auto otherParent = other.nth(divergeIndex);
-                if (!thisParent && otherParent) {
-                    // other is deeper in compared to this, other should come first
-                    return false;
-                }
-                else if (!otherParent && thisParent) {
-                    // this is deeper in compared to other, this should come first
-                    return true;
-                }
-                else if (thisParent != otherParent) {
-                    // higher Z order should come first
-                    if (thisParent->getZOrder() == otherParent->getZOrder()) {
-                        // same Z order, use order of arrival
-                        return thisParent->getOrderOfArrival() > otherParent->getOrderOfArrival();
+            // if we're going down, since all leaves of the "relevant" subgraph are delegates, we won't go up again
+            void goDown() {
+                while (iterable->children_map.contains(node)) {
+                    auto& children = iterable->children_map[node];
+                    // lazily sort and link siblings only when needed
+                    std::ranges::sort(children, [](CCNode* a, CCNode* b) {
+                        if (a->getZOrder() != b->getZOrder()) return a->getZOrder() > b->getZOrder();
+                        return a->getOrderOfArrival() > b->getOrderOfArrival();
+                    });
+                    auto it2 = children.begin();
+                    decltype(it2) it1;
+                    // we know children is nonempty
+                    while (it1 = it2, ++it2 != children.end()) {
+                        iterable->sibling_map[*it1] = *it2;
                     }
-                    return thisParent->getZOrder() > otherParent->getZOrder();
+                    node = children.front();
                 }
             }
-            // reached the leaves together without diverging, same node?
-            return false;
-        }
+
+            // postfix traversal of the "relevant" subgraph, directly moving to siblings instead of going parent->child
+            // (to make it easy to iterate over siblings in the right order)
+            iterator& operator++() {
+                // postfix so we must be going up
+                while (!iterable->sibling_map.contains(node)) {
+                    node = node->getParent();
+                    if (!node || iterable->handler_map.contains(node)) return *this;
+                }
+                node = iterable->sibling_map[node];
+                goDown();
+                return *this;
+            }
+
+            Handler* operator*() const { return iterable->handler_map[node]; }
+
+            bool operator==(std::nullptr_t) const { return !node; }
+
+            void operator++(int) { ++*this; }
+        };
+        static_assert(std::input_iterator<iterator>);
+
+        iterator begin() { return {this}; }
+
+        std::nullptr_t end() { return nullptr; }
     };
 
-    template <class Handler>
-    std::vector<ParentPath<Handler>> getRegisteredPaths(CCArray* handlers) const {
-        std::vector<ParentPath<Handler>> paths;
-        for (auto handler : CCArrayExt<Handler*>(handlers)) {
-            if (!handler) continue;
-            auto delegate = handler->getDelegate();
-            if (!delegate) continue;
-            auto node = typeinfo_cast<CCNode*>(delegate);
-            if (!node) continue;
-
-            paths.emplace_back(node, handler);
-        }
-        std::sort(paths.begin(), paths.end());
-        return paths;
-    }
-
     void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
-        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers);
+        auto handlers = HandlerIterable<CCTargetedTouchHandler>(m_pTargetedHandlers);
 
         std::vector<CCTouch*> touchesCopy;
         for (auto touch : *touches) {
@@ -92,17 +102,18 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         }
 
         for (auto touch : touchesCopy) {
-            for (auto& path : registeredPaths) {
-                auto delegate = path.handler->getDelegate();
-                auto claimedTouches = path.handler->m_pClaimedTouches;
-                auto swallowsTouches = path.handler->m_bSwallowsTouches;
+            for (auto handler : handlers) {
+                auto delegate = handler->getDelegate();
+                auto claimedTouches = handler->m_pClaimedTouches;
+                auto swallowsTouches = handler->m_bSwallowsTouches;
 
                 bool claimed = false;
                 if (index == CCTOUCHBEGAN) {
                     claimed = delegate->ccTouchBegan(touch, event);
 
                     if (claimed) {
-                        log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
+                        auto node = typeinfo_cast<CCNode*>(delegate);
+                        log::debug("Node {}({}) claimed touch", node, node->getID());
                         claimedTouches->addObject(touch);
                     }
                 } 
@@ -135,10 +146,10 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     }
 
     void handleStandardHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
-        auto registeredPaths = this->getRegisteredPaths<CCStandardTouchHandler>(m_pStandardHandlers);
+        auto handlers = HandlerIterable<CCStandardTouchHandler>(m_pStandardHandlers);
 
-        for (auto& path : registeredPaths) {
-            auto delegate = path.handler->getDelegate();
+        for (auto handler : handlers) {
+            auto delegate = handler->getDelegate();
 
             switch (m_sHandlerHelperData[index].m_type) {
             case CCTOUCHBEGAN:
