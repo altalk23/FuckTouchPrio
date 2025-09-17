@@ -1,5 +1,5 @@
 {
-	"geode": "4.7.0",
+	"geode": "4.8.0",
 	"gd": {
 		"win": "2.2074",
 		"android": "2.2074",
@@ -7,7 +7,7 @@
 		"ios": "2.2074"
 	},
 	"version": "v1.0.0",
-	"id": "alk.z-touch-prio",
+	"id": "alk.better-touch-prio",
 	"name": "Better Touch Prio",
 	"developer": "alk",
 	"description": "Removes the need for touch priority by using z-index for touch.",
