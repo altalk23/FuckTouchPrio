@@ -1,3 +1,5 @@
+#include "Geode/cocos/touch_dispatcher/CCTouchDispatcher.h"
+#include "Geode/cocos/touch_dispatcher/CCTouchHandler.h"
 #include <Geode/Geode.hpp>
 #include <unordered_map>
 
@@ -34,6 +36,13 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             return (n < path.size()) ? path[path.size() - 1 - n] : nullptr;
         }
 
+        bool swallows() const {
+            if constexpr (std::is_same_v<Handler, CCTargetedTouchHandler>) {
+                return handler->m_bSwallowsTouches;
+            }
+            return false;
+        }
+
         // assumes all nodes will converge at the same root
         bool operator<(ParentPath const& other) const {
             if (this->root() != other.root()) {
@@ -45,15 +54,39 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             for (size_t divergeIndex = 1; divergeIndex < maxLength; ++divergeIndex) {
                 auto thisParent = this->nth(divergeIndex);
                 auto otherParent = other.nth(divergeIndex);
+
+                // okay so i know this is complicated
+                // and yes it is but basically
+                // lets have 2 nodes, both respond to touch
+                // one is a parent to other, lets call parent and child
+                // if parent doesnt swallow the touch, in gd usually what that means is
+                // both parent and child can get the touch, and usually parent "steals"
+                // the touch from the child whenever necessary
+                // at least thats how scroll layers kind of work in gd
+                // this is what its trying to emulate basically
+
+                // swallows like a good boy >w<\n
+                // https://github.com/geode-sdk/api/commit/01bcacde38a225edb51a06961ce6553851dd24c5
+
                 if (!thisParent && otherParent) {
                     // other is deeper in compared to this, other should come first
-                    return false;
+                    // if we dont swallow touches we can allow it to come after us though
+                    // we swallow: false
+                    // we dont and they swallow: true
+                    // both dont swallow: false
+                    return !this->swallows() && other.swallows();
                 }
                 else if (!otherParent && thisParent) {
                     // this is deeper in compared to other, this should come first
-                    return true;
+                    // if other doesnt swallow touches we can allow it to come before us though
+                    // they swallow: true
+                    // they dont and we do: false
+                    // both dont swallow: true
+                    return other.swallows() || !this->swallows();
                 }
                 else if (thisParent != otherParent) {
+                    // otherwise we dont care anyway
+                    
                     // higher Z order should come first
                     if (thisParent->getZOrder() == otherParent->getZOrder()) {
                         // same Z order, use order of arrival
