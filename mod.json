@@ -6,9 +6,13 @@
 		"mac": "2.2074",
 		"ios": "2.2074"
 	},
-	"id": "alk.fuck-touch-prio",
-	"name": "Fuck Touch Prio",
 	"version": "v1.0.0",
+	"id": "alk.z-touch-prio",
+	"name": "Better Touch Prio",
 	"developer": "alk",
-	"description": ""
+	"description": "Removes the need for touch priority by using z-index for touch.",
+	"links": {
+		"source": "https://github.com/altalk23/FuckTouchPrio"
+	},
+	"tags": [ "universal", "enhancement" ]
 }
