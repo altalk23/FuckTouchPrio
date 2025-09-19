@@ -1,9 +1,22 @@
 #include "Geode/cocos/touch_dispatcher/CCTouchDispatcher.h"
 #include "Geode/cocos/touch_dispatcher/CCTouchHandler.h"
+#include "Geode/loader/Event.hpp"
+#include "Geode/loader/SettingV3.hpp"
 #include <Geode/Geode.hpp>
+#include <memory>
 #include <unordered_map>
 
 using namespace geode::prelude;
+
+static bool s_enableDebugLogs = false;
+static auto _ = new EventListener<SettingChangedFilterV3>(+[](std::shared_ptr<SettingV3> event) {
+    if (auto boolSetting = typeinfo_cast<BoolSettingV3*>(event.get())) {
+        if (boolSetting->getKey() == "enable-debug-logs") {
+            s_enableDebugLogs = boolSetting->getValue();
+            log::info("Debug logs {}", s_enableDebugLogs ? "enabled" : "disabled");
+        }
+    }
+}, SettingChangedFilterV3(Mod::get(), "enable-debug-logs"));
 
 #include <Geode/modify/CCTouchDispatcher.hpp>
 
@@ -135,7 +148,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                     claimed = delegate->ccTouchBegan(touch, event);
 
                     if (claimed) {
-                        log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
+                        if (s_enableDebugLogs) log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
                         claimedTouches->addObject(touch);
                     }
                 } 

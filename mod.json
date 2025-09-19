@@ -6,7 +6,7 @@
 		"mac": "2.2074",
 		"ios": "2.2074"
 	},
-	"version": "v1.0.0",
+	"version": "v1.0.1",
 	"id": "alk.better-touch-prio",
 	"name": "Better Touch Prio",
 	"developer": "alk",
@@ -14,5 +14,13 @@
 	"links": {
 		"source": "https://github.com/altalk23/FuckTouchPrio"
 	},
-	"tags": [ "universal", "enhancement" ]
+	"tags": [ "universal", "enhancement" ],
+	"settings": {
+		"enable-debug-logs": {
+			"type": "bool",
+			"name": "Enable Debug Logs",
+			"description": "Enables debug logs for the mod.",
+			"default": false
+		}
+	}
 }
