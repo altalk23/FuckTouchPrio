@@ -1,14 +1,9 @@
-#include "Geode/cocos/touch_dispatcher/CCTouchDispatcher.h"
-#include "Geode/cocos/touch_dispatcher/CCTouchHandler.h"
-#include "Geode/loader/Event.hpp"
-#include "Geode/loader/SettingV3.hpp"
 #include <Geode/Geode.hpp>
-#include <memory>
-#include <unordered_map>
+#include <Geode/utils/VMTHookManager.hpp>
 
 using namespace geode::prelude;
 
-static bool s_enableDebugLogs = false;
+static bool s_enableDebugLogs = Mod::get()->getSettingValue<bool>("enable-debug-logs");
 static auto _ = new EventListener<SettingChangedFilterV3>(+[](std::shared_ptr<SettingV3> event) {
     if (auto boolSetting = typeinfo_cast<BoolSettingV3*>(event.get())) {
         if (boolSetting->getKey() == "enable-debug-logs") {
@@ -186,6 +181,8 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         for (auto& path : registeredPaths) {
             auto delegate = path.handler->getDelegate();
 
+            if (s_enableDebugLogs) log::debug("Node {}({}) is standard handler", path.leaf(), path.leaf()->getID());
+
             switch (m_sHandlerHelperData[index].m_type) {
             case CCTOUCHBEGAN:
                 delegate->ccTouchesBegan(touches, event);
@@ -280,4 +277,64 @@ struct FuckEditorPrio : Modify<FuckEditorPrio, GJBaseGameLayer> {
 
         return true;
     }
+};
+
+class EditorUITouchListener : public CCLayer {
+public:
+    static EditorUITouchListener* create() {
+        auto ret = new EditorUITouchListener;
+        if (ret->init()) {
+            ret->autorelease();
+            return ret;
+        }
+
+        delete ret;
+        return nullptr;
+    }
+
+    bool init() override {
+        if (!CCLayer::init()) return false;
+
+        setTouchEnabled(true);
+        setID("editorui-touch-listener"_spr);
+
+        return true;
+    }
+
+    void registerWithTouchDispatcher() override {
+        CCTouchDispatcher::get()->addTargetedDelegate(this, 0, false);
+    }
+
+    bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
+        return EditorUI::get()->ccTouchBegan(touch, event);
+    }
+
+    void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
+        EditorUI::get()->ccTouchMoved(touch, event);
+    }
+
+    void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
+        EditorUI::get()->ccTouchEnded(touch, event);
+    }
+};
+
+#include <Geode/modify/LevelEditorLayer.hpp>
+struct FuckEditorPrio2 : Modify<FuckEditorPrio2, LevelEditorLayer> {
+    $override
+    bool init(GJGameLevel* level, bool p1) {
+        if (!LevelEditorLayer::init(level, p1)) return false;
+
+        // this simulates touches on editorui but below editorui - basically
+        // where visually editorui actually should be claiming touches (below everything)
+        addChild(EditorUITouchListener::create(), -1000);
+
+        return true;
+    }
+};
+
+// and disable editorui touches
+#include <Geode/modify/EditorUI.hpp>
+struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
+    $override
+    void registerWithTouchDispatcher() override {}
 };
