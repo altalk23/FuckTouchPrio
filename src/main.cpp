@@ -336,5 +336,14 @@ struct FuckEditorPrio2 : Modify<FuckEditorPrio2, LevelEditorLayer> {
 #include <Geode/modify/EditorUI.hpp>
 struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
     $override
-    void registerWithTouchDispatcher() override {}
+    void registerWithTouchDispatcher() override {
+        // a bunch of registerWithTouchDispatcher funcs here are merged so test
+        // if this is the right one
+        
+        if (geode::cast::typeinfo_cast<EditorUI*>(this)) {
+            return;
+        }
+
+        EditorUI::registerWithTouchDispatcher();
+    }
 };
