@@ -328,6 +328,8 @@ struct FuckEditorPrio2 : Modify<FuckEditorPrio2, LevelEditorLayer> {
         // where visually editorui actually should be claiming touches (below everything)
         addChild(EditorUITouchListener::create(), -1000);
 
+        m_uiLayer->setZOrder(-1001);
+
         return true;
     }
 };
@@ -339,7 +341,7 @@ struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
     void registerWithTouchDispatcher() override {
         // a bunch of registerWithTouchDispatcher funcs here are merged so test
         // if this is the right one
-        
+
         if (geode::cast::typeinfo_cast<EditorUI*>(this)) {
             return;
         }
