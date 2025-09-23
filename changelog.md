@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.2
+ * Fix issues with mods that add extra buttons in the gameplay area of the editor
+
 ## v1.0.1
  * Make debug logs optional
 
