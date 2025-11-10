@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.4
+ * Fix a crash on Android32
+
 ## v1.0.3
  * Fix an issue that made it so you couldn't use the mouse to jump
 
