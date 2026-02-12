@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.5
+ * Geode v5 alpha support
+
 ## v1.0.4
  * Fix a crash on Android32
 
