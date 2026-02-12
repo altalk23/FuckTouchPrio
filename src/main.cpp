@@ -4,14 +4,11 @@
 using namespace geode::prelude;
 
 static bool s_enableDebugLogs = Mod::get()->getSettingValue<bool>("enable-debug-logs");
-static auto _ = new EventListener<SettingChangedFilterV3>(+[](std::shared_ptr<SettingV3> event) {
-    if (auto boolSetting = typeinfo_cast<BoolSettingV3*>(event.get())) {
-        if (boolSetting->getKey() == "enable-debug-logs") {
-            s_enableDebugLogs = boolSetting->getValue();
-            log::info("Debug logs {}", s_enableDebugLogs ? "enabled" : "disabled");
-        }
-    }
-}, SettingChangedFilterV3(Mod::get(), "enable-debug-logs"));
+$on_mod(Loaded) {
+    SettingChangedEventV3(Mod::get(), "enable-debug-logs").listen([](std::shared_ptr<geode::SettingV3> setting) {
+        s_enableDebugLogs = Mod::get()->getSettingValue<bool>("enable-debug-logs");
+    }).leak();
+}
 
 #include <Geode/modify/CCTouchDispatcher.hpp>
 
@@ -94,7 +91,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                 }
                 else if (thisParent != otherParent) {
                     // otherwise we dont care anyway
-                    
+
                     // higher Z order should come first
                     if (thisParent->getZOrder() == otherParent->getZOrder()) {
                         // same Z order, use order of arrival
@@ -146,7 +143,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                         if (s_enableDebugLogs) log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
                         claimedTouches->addObject(touch);
                     }
-                } 
+                }
                 else if (claimedTouches->containsObject(touch)) {
                     // moved ended canceled
                     claimed = true;
@@ -226,6 +223,8 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             m_bToRemove = false;
             for (unsigned int i = 0; i < m_pHandlersToRemove->num; ++i) {
                 for (auto handler : CCArrayExt<CCTargetedTouchHandler*>(m_pTargetedHandlers)) {
+                    // crashes here indexing into m_pHandlesToRemove->arr (this+72 +16 +i*4)
+                    // i == 0 in all crashlogs (r9)
                     if (handler->getDelegate() == m_pHandlersToRemove->arr[i]) {
                         m_pTargetedHandlers->removeObject(handler);
                         break;
@@ -253,8 +252,8 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                     m_pStandardHandlers->addObject(handler);
                 }
             }
-    
-            m_pHandlersToAdd->removeAllObjects();    
+
+            m_pHandlersToAdd->removeAllObjects();
         }
 
         if (m_bToQuit) {
