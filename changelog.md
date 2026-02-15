@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.6
+ * Geode v5 beta support
+ * Realisation that the last version should've been a beta
+
 ## v1.0.5
  * Geode v5 alpha support
 
