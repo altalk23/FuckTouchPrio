@@ -325,9 +325,8 @@ struct FuckEditorPrio2 : Modify<FuckEditorPrio2, LevelEditorLayer> {
 
         // this simulates touches on editorui but below editorui - basically
         // where visually editorui actually should be claiming touches (below everything)
-        addChild(EditorUITouchListener::create(), -1000);
+        addChild(EditorUITouchListener::create(), 3);
 
-        m_uiLayer->setZOrder(-1001);
 
         return true;
     }

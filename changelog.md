@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.7
+ * Fix platformer arrows not appearing on mobile
+
 ## v1.0.6
  * Geode v5 beta support
  * Realisation that the last version should've been a beta
