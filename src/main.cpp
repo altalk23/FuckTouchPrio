@@ -22,11 +22,27 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         std::vector<CCNode*> path;
         Handler* handler = nullptr;
 
+        ParentPath(Handler* handler) : handler(handler) {}
+        ParentPath(ParentPath&& other) = default;
+        ParentPath& operator=(ParentPath&& other) = default;
+
         ParentPath(CCNode* node, Handler* handler) : handler(handler) {
             while (node) {
                 path.push_back(node);
                 node = node->getParent();
             }
+        }
+
+        static std::optional<ParentPath> filtered(CCNode* node, Handler* handler, CCNode* filter) {
+            ParentPath ret{handler};
+            bool confirmed = false;
+            while (node) {
+                ret.path.push_back(node);
+                if (node == filter) confirmed = true;
+                node = node->getParent();
+            }
+            if (confirmed) return ret;
+            return std::nullopt;
         }
 
         CCNode* leaf() const {
@@ -106,7 +122,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     };
 
     template <class Handler>
-    std::vector<ParentPath<Handler>> getRegisteredPaths(CCArray* handlers) const {
+    std::vector<ParentPath<Handler>> getRegisteredPaths(CCArray* handlers, std::optional<CCNode*> filter) const {
         std::vector<ParentPath<Handler>> paths;
         for (auto handler : CCArrayExt<Handler*>(handlers)) {
             if (!handler) continue;
@@ -115,14 +131,67 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             auto node = typeinfo_cast<CCNode*>(delegate);
             if (!node) continue;
 
-            paths.emplace_back(node, handler);
+            if (filter) {
+                auto filtered = ParentPath<Handler>::filtered(node, handler, *filter);
+                if (filtered) {
+                    paths.push_back(std::move(filtered.value()));
+                }
+            }
+            else {
+                paths.emplace_back(node, handler);
+            }
         }
         std::sort(paths.begin(), paths.end());
         return paths;
     }
 
-    void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
-        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers);
+    template <class Handler>
+    bool handleSingleTargetedHandlers(CCSet* touches, CCTouch* touch, CCEvent* event, unsigned int index, std::vector<ParentPath<Handler>> const& registeredPaths) {
+        bool touchClaimed = false;
+        for (auto& path : registeredPaths) {
+            auto delegate = path.handler->getDelegate();
+            auto claimedTouches = path.handler->m_pClaimedTouches;
+            auto swallowsTouches = path.handler->m_bSwallowsTouches;
+
+            bool claimed = false;
+            if (index == CCTOUCHBEGAN) {
+                claimed = delegate->ccTouchBegan(touch, event);
+
+                if (claimed) {
+                    if (s_enableDebugLogs) log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
+                    claimedTouches->addObject(touch);
+                }
+            }
+            else if (claimedTouches->containsObject(touch)) {
+                // moved ended canceled
+                claimed = true;
+
+                switch (m_sHandlerHelperData[index].m_type) {
+                case CCTOUCHMOVED:
+                    delegate->ccTouchMoved(touch, event);
+                    break;
+                case CCTOUCHENDED:
+                    delegate->ccTouchEnded(touch, event);
+                    claimedTouches->removeObject(touch);
+                    break;
+                case CCTOUCHCANCELLED:
+                    delegate->ccTouchCancelled(touch, event);
+                    claimedTouches->removeObject(touch);
+                    break;
+                }
+            }
+
+            if (claimed && swallowsTouches) {
+                touchClaimed = true;
+                if (touches) touches->removeObject(touch);
+                break;
+            }
+        }
+        return touchClaimed;
+    }
+
+    void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index, std::optional<CCNode*> filter = std::nullopt) {
+        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers, filter);
 
         std::vector<CCTouch*> touchesCopy;
         for (auto touch : *touches) {
@@ -130,50 +199,12 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         }
 
         for (auto touch : touchesCopy) {
-            for (auto& path : registeredPaths) {
-                auto delegate = path.handler->getDelegate();
-                auto claimedTouches = path.handler->m_pClaimedTouches;
-                auto swallowsTouches = path.handler->m_bSwallowsTouches;
-
-                bool claimed = false;
-                if (index == CCTOUCHBEGAN) {
-                    claimed = delegate->ccTouchBegan(touch, event);
-
-                    if (claimed) {
-                        if (s_enableDebugLogs) log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
-                        claimedTouches->addObject(touch);
-                    }
-                }
-                else if (claimedTouches->containsObject(touch)) {
-                    // moved ended canceled
-                    claimed = true;
-
-                    switch (m_sHandlerHelperData[index].m_type) {
-                    case CCTOUCHMOVED:
-                        delegate->ccTouchMoved(touch, event);
-                        break;
-                    case CCTOUCHENDED:
-                        delegate->ccTouchEnded(touch, event);
-                        claimedTouches->removeObject(touch);
-                        break;
-                    case CCTOUCHCANCELLED:
-                        delegate->ccTouchCancelled(touch, event);
-                        claimedTouches->removeObject(touch);
-                        break;
-                    }
-                }
-
-                if (claimed && swallowsTouches) {
-                    touches->removeObject(touch);
-
-                    break;
-                }
-            }
+            this->handleSingleTargetedHandlers(touches, touch, event, index, registeredPaths);
         }
     }
 
     void handleStandardHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
-        auto registeredPaths = this->getRegisteredPaths<CCStandardTouchHandler>(m_pStandardHandlers);
+        auto registeredPaths = this->getRegisteredPaths<CCStandardTouchHandler>(m_pStandardHandlers, std::nullopt);
 
         for (auto& path : registeredPaths) {
             auto delegate = path.handler->getDelegate();
@@ -262,6 +293,12 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             m_pTargetedHandlers->removeAllObjects();
         }
     }
+
+    bool handleSingleTargetedHandlersWithFilter(CCTouch* touch, CCEvent* event, unsigned int index, CCNode* filter) {
+        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers, filter);
+
+        return this->handleSingleTargetedHandlers(nullptr, touch, event, index, registeredPaths);
+    }
 };
 
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -278,11 +315,13 @@ struct FuckEditorPrio : Modify<FuckEditorPrio, GJBaseGameLayer> {
     }
 };
 
-class EditorUITouchListener : public CCLayer {
+class ObjectLayerTouchListener: public CCLayer {
 public:
-    static EditorUITouchListener* create() {
-        auto ret = new EditorUITouchListener;
-        if (ret->init()) {
+    CCLayer* m_objectLayer;
+
+    static ObjectLayerTouchListener* create(CCLayer* objectLayer) {
+        auto ret = new ObjectLayerTouchListener;
+        if (ret->init(objectLayer)) {
             ret->autorelease();
             return ret;
         }
@@ -291,59 +330,47 @@ public:
         return nullptr;
     }
 
-    bool init() override {
+    bool init(CCLayer* objectLayer) {
         if (!CCLayer::init()) return false;
 
-        setTouchEnabled(true);
-        setID("editorui-touch-listener"_spr);
+        m_objectLayer = objectLayer;
+
+        this->setTouchEnabled(true);
+        this->setID("object-layer-touch-listener"_spr);
 
         return true;
     }
 
     void registerWithTouchDispatcher() override {
-        CCTouchDispatcher::get()->addTargetedDelegate(this, 0, false);
+        CCTouchDispatcher::get()->addTargetedDelegate(this, 0, true);
     }
 
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
-        return EditorUI::get()->ccTouchBegan(touch, event);
+        return static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHBEGAN, m_objectLayer);
     }
 
     void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
-        EditorUI::get()->ccTouchMoved(touch, event);
+        static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHMOVED, m_objectLayer);
     }
 
     void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
-        EditorUI::get()->ccTouchEnded(touch, event);
+        static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHENDED, m_objectLayer);
+    }
+
+    void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
+        static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHCANCELLED, m_objectLayer);
     }
 };
 
-#include <Geode/modify/LevelEditorLayer.hpp>
-struct FuckEditorPrio2 : Modify<FuckEditorPrio2, LevelEditorLayer> {
-    $override
-    bool init(GJGameLevel* level, bool p1) {
-        if (!LevelEditorLayer::init(level, p1)) return false;
-
-        // this simulates touches on editorui but below editorui - basically
-        // where visually editorui actually should be claiming touches (below everything)
-        addChild(EditorUITouchListener::create(), 3);
-
-
-        return true;
-    }
-};
-
-// and disable editorui touches
 #include <Geode/modify/EditorUI.hpp>
 struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
     $override
-    void registerWithTouchDispatcher() override {
-        // a bunch of registerWithTouchDispatcher funcs here are merged so test
-        // if this is the right one
+    bool init(LevelEditorLayer* editorLayer) {
+        if (!EditorUI::init(editorLayer)) return false;
 
-        if (geode::cast::typeinfo_cast<EditorUI*>(this)) {
-            return;
-        }
+        // below everything else in editorui, but inside editorui so it runs before editorui's touches
+        this->addChild(ObjectLayerTouchListener::create(editorLayer->m_objectLayer), -1000); 
 
-        EditorUI::registerWithTouchDispatcher();
+        return true;
     }
 };

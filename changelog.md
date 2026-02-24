@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.8 
+ * Forward object layer touches in editor from inside editor ui using a custom forwarder class
+
 ## v1.0.7
  * Fix platformer arrows not appearing on mobile
 
