@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.10
+ * Replace swallowing logic with stealing logic, which only affects non GD scroll layers 
+
 ## v1.0.9
  * Fix ordering for nodes in notification node instead
 

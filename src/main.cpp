@@ -64,6 +64,23 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             return false;
         }
 
+        bool steals() const {
+            // if it swallows, no need to check for stealing behavior
+            if (this->swallows()) return false; 
+
+            if constexpr (std::is_same_v<Handler, CCTargetedTouchHandler>) {
+                if (auto leaf = this->leaf()) {
+                    // the stealers, might think of a more general way of doing this later
+                    if (typeinfo_cast<TableView*>(leaf) || typeinfo_cast<BoomScrollLayer*>(leaf)) return true;
+                    // custom stealer:
+                    // if (auto scrollLayer = typeinfo_cast<ScrollLayer*>(leaf)) {
+                    //     return scrollLayer->isStealingTouches();
+                    // }
+                }
+            }
+            return false;
+        }
+
         // assumes all nodes will converge at the same root
         bool operator<(ParentPath const& other) const {
             if (this->root() != other.root()) {
@@ -101,19 +118,20 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
 
                 if (!thisParent && otherParent) {
                     // other is deeper in compared to this, other should come first
-                    // if we dont swallow touches we can allow it to come after us though
-                    // we swallow: false
-                    // we dont and they swallow: true
-                    // both dont swallow: false
-                    return !this->swallows() && other.swallows();
+                    // we are the parent, they are the child
+                    // if we dont steal touches we can allow it to come after us though
+                    // we steal: true, we are first
+                    // if there are nested stealers we dont handle that right now, 
+                    // and im sure rob doesn't either, but if it ever happens
+                    // shoot me a message 
+                    return this->steals();
                 }
                 else if (!otherParent && thisParent) {
                     // this is deeper in compared to other, this should come first
-                    // if other doesnt swallow touches we can allow it to come before us though
-                    // they swallow: true
-                    // they dont and we do: false
-                    // both dont swallow: true
-                    return other.swallows() || !this->swallows();
+                    // they are the parent, we are the child
+                    // if other doesnt steal touches we can allow it to come before us though
+                    // they steal: false, they are first
+                    return !other.steals();
                 }
                 else if (thisParent != otherParent) {
                     // otherwise we dont care anyway
