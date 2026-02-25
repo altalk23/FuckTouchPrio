@@ -67,6 +67,16 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         // assumes all nodes will converge at the same root
         bool operator<(ParentPath const& other) const {
             if (this->root() != other.root()) {
+                auto director = CCDirector::get();
+                auto const runningScene = director->m_pRunningScene;
+                auto const notifNode = director->m_pNotificationNode;
+                if (this->root() == runningScene && other.root() == notifNode) { // other should come first
+                    return false;
+                }
+                else if (this->root() == notifNode && other.root() == runningScene) { // this should come first
+                    return true;
+                }
+                // not registered into anything, not added to scene?
                 return this->root() < other.root(); // different roots, cannot compare
             }
 

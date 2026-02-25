@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.9
+ * Fix ordering for nodes in notification node instead
+
 ## v1.0.8 
  * Forward object layer touches in editor from inside editor ui using a custom forwarder class
 
