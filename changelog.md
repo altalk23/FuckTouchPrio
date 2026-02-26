@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.13
+ * Remove the nested false positives from leak detection
+
 ## v1.0.12
  * Add leak detection to between-scene leaked prio targets
 

@@ -1,34 +1,64 @@
 #include <Geode/Geode.hpp>
 #include <Geode/utils/VMTHookManager.hpp>
+#include <Geode/ui/SceneEvent.hpp>
 #include <unordered_set>
 
 using namespace geode::prelude;
+
+struct SavedNodeData {
+    std::string id;
+    std::string type;
+    void* pointer;
+
+    SavedNodeData(cocos2d::CCObject* obj) : type(typeid(*obj).name()), pointer(obj) {
+        if (auto node = typeinfo_cast<CCNode*>(obj)) {
+            id = node->getID();
+        }
+        else {
+            id = "N/A";
+        }
+    }
+};
+
+template<>
+struct std::hash<SavedNodeData> {
+    std::size_t operator()(SavedNodeData const& k) const {
+        return std::hash<void*>()(k.pointer);
+    }
+};
+
+template<>
+struct std::equal_to<SavedNodeData> {
+    bool operator()(SavedNodeData const& lhs, SavedNodeData const& rhs) const {
+        return lhs.pointer == rhs.pointer;
+    }
+};
+static inline std::unordered_set<SavedNodeData> s_savedForcePrioObjects;
+static inline std::unordered_set<cocos2d::CCObject*> s_forcePrioObjects;
 
 static bool s_enableDebugLogs = Mod::get()->getSettingValue<bool>("enable-debug-logs");
 $on_mod(Loaded) {
     SettingChangedEventV3(Mod::get(), "enable-debug-logs").listen([](std::shared_ptr<geode::SettingV3> setting) {
         s_enableDebugLogs = Mod::get()->getSettingValue<bool>("enable-debug-logs");
     }).leak();
-}
 
-static inline std::unordered_set<cocos2d::CCObject*> s_forcePrioObjects;
+    SceneEvent().listen([](auto scene) {
+        if (s_savedForcePrioObjects.size() != s_forcePrioObjects.size()) {
+            log::error("Detected leaked force prio!! Printing all leaked objects!!");
+            for (auto obj : s_savedForcePrioObjects) {
+                log::error("{} - {}({})", obj.type, obj.pointer, obj.id);
+            }
+        }
+    }).leak();
+}
 
 #include <Geode/modify/CCDirector.hpp>
 struct FuckDirector : Modify<FuckDirector, CCDirector> {
     $override
     void setNextScene() {
-        auto dispatcher = CCTouchDispatcher::get();
-        if (dispatcher->m_forcePrio != 0) {
-            log::error("Detected leaked force prio!!");
-            log::error("Printing all leaked objects!!");
-            for (auto obj : s_forcePrioObjects) {
-                if (auto node = typeinfo_cast<CCNode*>(obj)) {
-                    log::error("{}({})", node, node->getID());
-                }
-                else {
-                    log::error("{}", obj);
-                }
-            }
+        s_savedForcePrioObjects.clear();
+        for (auto obj : s_forcePrioObjects) {
+            s_savedForcePrioObjects.emplace(obj);
         }
         CCDirector::setNextScene();
     }
