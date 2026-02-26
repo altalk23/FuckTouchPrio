@@ -74,9 +74,9 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                     // the stealers, might think of a more general way of doing this later
                     if (typeinfo_cast<TableView*>(leaf) || typeinfo_cast<BoomScrollLayer*>(leaf)) return true;
                     // custom stealer:
-                    // if (auto scrollLayer = typeinfo_cast<ScrollLayer*>(leaf)) {
-                    //     return scrollLayer->isStealingTouches();
-                    // }
+                    if (auto scrollLayer = typeinfo_cast<ScrollLayer*>(leaf)) {
+                        return scrollLayer->isStealingTouches();
+                    }
                 }
             }
             return false;

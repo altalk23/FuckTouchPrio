@@ -2,6 +2,7 @@
 
 ## v1.0.11
  * Add explicit leaked node detection to handler logic
+ * Add stealing logic of ScrollLayer to the list (I should figure out a way to generalize this)
 
 ## v1.0.10
  * Replace swallowing logic with stealing logic, which only affects non GD scroll layers 
