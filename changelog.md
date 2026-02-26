@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.12
+ * Add leak detection to between-scene leaked prio targets
+
 ## v1.0.11
  * Add explicit leaked node detection to handler logic
  * Add stealing logic of ScrollLayer to the list (I should figure out a way to generalize this)

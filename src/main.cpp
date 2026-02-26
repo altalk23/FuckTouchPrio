@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/utils/VMTHookManager.hpp>
+#include <unordered_set>
 
 using namespace geode::prelude;
 
@@ -10,11 +11,48 @@ $on_mod(Loaded) {
     }).leak();
 }
 
+static inline std::unordered_set<cocos2d::CCObject*> s_forcePrioObjects;
+
+#include <Geode/modify/CCDirector.hpp>
+struct FuckDirector : Modify<FuckDirector, CCDirector> {
+    $override
+    void setNextScene() {
+        auto dispatcher = CCTouchDispatcher::get();
+        if (dispatcher->m_forcePrio != 0) {
+            log::error("Detected leaked force prio!!");
+            log::error("Printing all leaked objects!!");
+            for (auto obj : s_forcePrioObjects) {
+                if (auto node = typeinfo_cast<CCNode*>(obj)) {
+                    log::error("{}({})", node, node->getID());
+                }
+                else {
+                    log::error("{}", obj);
+                }
+            }
+        }
+        CCDirector::setNextScene();
+    }
+};
+
 #include <Geode/modify/CCTouchDispatcher.hpp>
 
 struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     static void onModify(auto& self) {
         (void)self.setHookPriority("cocos2d::CCTouchDispatcher::touches", Priority::Replace);
+    }
+
+    $override
+    void registerForcePrio(cocos2d::CCObject* obj, int prio) {
+        // log::debug("register {}", obj);
+        s_forcePrioObjects.insert(obj);
+        return CCTouchDispatcher::registerForcePrio(obj, prio);
+    }
+
+    $override
+    void unregisterForcePrio(cocos2d::CCObject* obj) {
+        // log::debug("unregister {}", obj);
+        s_forcePrioObjects.erase(obj);
+        return CCTouchDispatcher::unregisterForcePrio(obj);
     }
 
     template <class Handler>
