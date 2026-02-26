@@ -21,6 +21,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     struct ParentPath {
         std::vector<CCNode*> path;
         Handler* handler = nullptr;
+        mutable bool hasInvalidRoot = false;
 
         ParentPath(Handler* handler) : handler(handler) {}
         ParentPath(ParentPath&& other) = default;
@@ -81,20 +82,36 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             return false;
         }
 
+        bool compareRoots(ParentPath const& other) const {
+            // same root, not less than
+            if (this->root() == other.root()) return false; 
+            
+            auto director = CCDirector::get();
+            auto const rootOrder = std::array<CCNode*, 2>{director->m_pRunningScene, director->m_pNotificationNode};
+            auto thisRootIt = std::find(rootOrder.begin(), rootOrder.end(), this->root());
+            auto otherRootIt = std::find(rootOrder.begin(), rootOrder.end(), other.root());
+
+            if (thisRootIt == rootOrder.end()) {
+                // If either root is not in the known order, we can't compare them reliably
+                this->hasInvalidRoot = true;
+                return false;
+            }
+            if (otherRootIt == rootOrder.end()) {
+                other.hasInvalidRoot = true;
+                return false;
+            }
+
+            // if this is running scene and other is notification node, other will be 1 and this will be 0
+            // meaning other should come first, so we return false
+            // if this is notification node and other is running scene, other will be 0 and this will be 1
+            // meaning this should come first, so we return true
+            return thisRootIt > otherRootIt;
+        }
+
         // assumes all nodes will converge at the same root
         bool operator<(ParentPath const& other) const {
             if (this->root() != other.root()) {
-                auto director = CCDirector::get();
-                auto const runningScene = director->m_pRunningScene;
-                auto const notifNode = director->m_pNotificationNode;
-                if (this->root() == runningScene && other.root() == notifNode) { // other should come first
-                    return false;
-                }
-                else if (this->root() == notifNode && other.root() == runningScene) { // this should come first
-                    return true;
-                }
-                // not registered into anything, not added to scene?
-                return this->root() < other.root(); // different roots, cannot compare
+                return this->compareRoots(other);
             }
 
             size_t maxLength = std::max(path.size(), other.path.size());
@@ -176,17 +193,30 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     template <class Handler>
     bool handleSingleTargetedHandlers(CCSet* touches, CCTouch* touch, CCEvent* event, unsigned int index, std::vector<ParentPath<Handler>> const& registeredPaths) {
         bool touchClaimed = false;
+        if (index == CCTOUCHBEGAN) for (auto& path : registeredPaths) {
+            if (path.hasInvalidRoot) {
+                log::error("Handler {}({}) has an invalid root, detected leaked node!! Please report the issue to the owner of the node!!", path.leaf(), path.leaf()->getID());
+            }
+        }
+
         for (auto& path : registeredPaths) {
             auto delegate = path.handler->getDelegate();
             auto claimedTouches = path.handler->m_pClaimedTouches;
             auto swallowsTouches = path.handler->m_bSwallowsTouches;
+
+            if (path.hasInvalidRoot) continue;
 
             bool claimed = false;
             if (index == CCTOUCHBEGAN) {
                 claimed = delegate->ccTouchBegan(touch, event);
 
                 if (claimed) {
-                    if (s_enableDebugLogs) log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
+                    if (s_enableDebugLogs) {
+                        log::debug("Node {}({}) claimed touch", path.leaf(), path.leaf()->getID());
+                        // for (auto node : path.path) {
+                        //     log::debug("{} - {}", node, node->getID());
+                        // }
+                    }
                     claimedTouches->addObject(touch);
                 }
             }

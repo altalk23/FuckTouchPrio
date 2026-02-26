@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.11
+ * Add explicit leaked node detection to handler logic
+
 ## v1.0.10
  * Replace swallowing logic with stealing logic, which only affects non GD scroll layers 
 
