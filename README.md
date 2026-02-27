@@ -21,4 +21,4 @@ geode build
 
 ## Licenses
  * [Geode: BSL 1.0](https://github.com/geode-sdk/geode/blob/main/LICENSE.txt)
- * [This mod: Unlicense](https://github.com/altalk123/FuckTouchPrio/blob/main/LICENSE.txt)
+ * [This mod: Unlicense](https://github.com/altalk23/FuckTouchPrio/blob/main/LICENSE.txt)
