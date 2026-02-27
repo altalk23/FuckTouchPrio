@@ -64,6 +64,12 @@ struct FuckDirector : Modify<FuckDirector, CCDirector> {
     }
 };
 
+namespace tabcore {
+    namespace layout {
+        class Scroller;
+    }
+}
+
 #include <Geode/modify/CCTouchDispatcher.hpp>
 
 struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
@@ -133,18 +139,28 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             return false;
         }
 
+        bool isStealer(CCNode* node) const {
+            // general compat
+            if (node->getUserFlag("steals-touch"_spr)) return true;
+
+            // known stealers
+            if (typeinfo_cast<TableView*>(node)) return true;
+            if (typeinfo_cast<BoomScrollLayer*>(node)) return true;
+            if (typeinfo_cast<tabcore::layout::Scroller*>(node)) return true;
+
+            if (auto scrollLayer = typeinfo_cast<ScrollLayer*>(node)) {
+                return scrollLayer->isStealingTouches();
+            }
+            return false;
+        }
+
         bool steals() const {
             // if it swallows, no need to check for stealing behavior
             if (this->swallows()) return false; 
 
             if constexpr (std::is_same_v<Handler, CCTargetedTouchHandler>) {
                 if (auto leaf = this->leaf()) {
-                    // the stealers, might think of a more general way of doing this later
-                    if (typeinfo_cast<TableView*>(leaf) || typeinfo_cast<BoomScrollLayer*>(leaf)) return true;
-                    // custom stealer:
-                    if (auto scrollLayer = typeinfo_cast<ScrollLayer*>(leaf)) {
-                        return scrollLayer->isStealingTouches();
-                    }
+                    if (this->isStealer(leaf)) return true;
                 }
             }
             return false;
