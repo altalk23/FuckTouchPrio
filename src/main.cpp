@@ -66,7 +66,7 @@ struct FuckDirector : Modify<FuckDirector, CCDirector> {
 
 namespace tabcore {
     namespace layout {
-        class Scroller;
+        class Scroller : public cocos2d::CCNode {};
     }
 }
 
