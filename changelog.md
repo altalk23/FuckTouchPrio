@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.15
+ * Disable leak detection
+
 ## v1.0.14
  * Add Mega Hack Mobile scroll layer to the known stealer list
  * Add "alk.better-touch-prio/steals-touch" as a user flag for marking as touch stealer

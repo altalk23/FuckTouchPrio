@@ -42,27 +42,27 @@ $on_mod(Loaded) {
         s_enableDebugLogs = Mod::get()->getSettingValue<bool>("enable-debug-logs");
     }).leak();
 
-    SceneEvent().listen([](auto scene) {
-        if (s_savedForcePrioObjects.size() != s_forcePrioObjects.size()) {
-            log::error("Detected leaked force prio!! Printing all leaked objects!!");
-            for (auto obj : s_savedForcePrioObjects) {
-                log::error("{} - {}({})", obj.type, obj.pointer, obj.id);
-            }
-        }
-    }).leak();
+    // SceneEvent().listen([](auto scene) {
+    //     if (s_savedForcePrioObjects.size() != s_forcePrioObjects.size()) {
+    //         log::error("Detected leaked force prio!! Printing all leaked objects!!");
+    //         for (auto obj : s_savedForcePrioObjects) {
+    //             log::error("{} - {}({})", obj.type, obj.pointer, obj.id);
+    //         }
+    //     }
+    // }).leak();
 }
 
-#include <Geode/modify/CCDirector.hpp>
-struct FuckDirector : Modify<FuckDirector, CCDirector> {
-    $override
-    void setNextScene() {
-        s_savedForcePrioObjects.clear();
-        for (auto obj : s_forcePrioObjects) {
-            s_savedForcePrioObjects.emplace(obj);
-        }
-        CCDirector::setNextScene();
-    }
-};
+// #include <Geode/modify/CCDirector.hpp>
+// struct FuckDirector : Modify<FuckDirector, CCDirector> {
+//     $override
+//     void setNextScene() {
+//         s_savedForcePrioObjects.clear();
+//         for (auto obj : s_forcePrioObjects) {
+//             s_savedForcePrioObjects.emplace(obj);
+//         }
+//         CCDirector::setNextScene();
+//     }
+// };
 
 namespace tabcore {
     namespace layout {
