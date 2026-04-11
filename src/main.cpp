@@ -277,7 +277,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             if (filter) {
                 auto filtered = ParentPath<Handler>::filtered(node, handler, *filter);
                 if (filtered) {
-                    if (filtered.value().checkRoot()) {
+                    if (filtered.value().hasValidRoot()) {
                         paths.push_back(std::move(filtered.value()));
                     }
                     else {
