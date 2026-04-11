@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.16
+ * Fix leak when touch is registered more than once on a node
+ * Fix nodes with invalid roots still being checked
+
 ## v1.0.15
  * Disable leak detection
 
