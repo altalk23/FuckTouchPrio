@@ -166,6 +166,20 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             return false;
         }
 
+        bool hasValidRoot() {     
+            if (this->hasInvalidRoot) return false;
+
+            auto director = CCDirector::get();
+            auto const rootOrder = std::array<CCNode*, 2>{director->m_pRunningScene, director->m_pNotificationNode};
+            auto thisRootIt = std::find(rootOrder.begin(), rootOrder.end(), this->root());
+
+            if (thisRootIt == rootOrder.end()) {
+                this->hasInvalidRoot = true;
+                return false;
+            }
+            return true;
+        }
+
         bool compareRoots(ParentPath const& other) const {
             // same root, not less than
             if (this->root() == other.root()) return false; 
@@ -251,7 +265,7 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     };
 
     template <class Handler>
-    std::vector<ParentPath<Handler>> getRegisteredPaths(CCArray* handlers, std::optional<CCNode*> filter) const {
+    std::vector<ParentPath<Handler>> getRegisteredPaths(CCArray* handlers, std::optional<CCNode*> filter, std::vector<ParentPath<Handler>>& invalidRoots) const {
         std::vector<ParentPath<Handler>> paths;
         for (auto handler : CCArrayExt<Handler*>(handlers)) {
             if (!handler) continue;
@@ -263,11 +277,22 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
             if (filter) {
                 auto filtered = ParentPath<Handler>::filtered(node, handler, *filter);
                 if (filtered) {
-                    paths.push_back(std::move(filtered.value()));
+                    if (filtered.value().hasValidRoot()) {
+                        paths.push_back(std::move(filtered.value()));
+                    }
+                    else {
+                        invalidRoots.push_back(std::move(filtered.value()));
+                    }
                 }
             }
             else {
-                paths.emplace_back(node, handler);
+                auto path = ParentPath<Handler>(node, handler);
+                if (path.hasValidRoot()) {
+                    paths.push_back(std::move(path));
+                }
+                else {
+                    invalidRoots.push_back(std::move(path));
+                }
             }
         }
         std::sort(paths.begin(), paths.end());
@@ -277,11 +302,6 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     template <class Handler>
     bool handleSingleTargetedHandlers(CCSet* touches, CCTouch* touch, CCEvent* event, unsigned int index, std::vector<ParentPath<Handler>> const& registeredPaths) {
         bool touchClaimed = false;
-        if (index == CCTOUCHBEGAN) for (auto& path : registeredPaths) {
-            if (path.hasInvalidRoot) {
-                log::error("Handler {}({}) has an invalid root, detected leaked node!! Please report the issue to the owner of the node!!", path.leaf(), path.leaf()->getID());
-            }
-        }
 
         for (auto& path : registeredPaths) {
             auto delegate = path.handler->getDelegate();
@@ -332,8 +352,18 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
         return touchClaimed;
     }
 
+    template <class Handler>
+    void logInvalidRoots(std::vector<ParentPath<Handler>> const& invalidRoots) {
+        for (auto& path : invalidRoots) {
+            log::error("Handler {}({}) has an invalid root, detected leaked node!! Please report the issue to the owner of the node!!", path.leaf(), path.leaf()->getID());
+        }
+    }
+
     void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index, std::optional<CCNode*> filter = std::nullopt) {
-        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers, filter);
+        std::vector<ParentPath<CCTargetedTouchHandler>> invalidRoots;
+        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers, filter, invalidRoots);
+
+        if (index == CCTOUCHBEGAN) logInvalidRoots(invalidRoots);
 
         std::vector<CCTouch*> touchesCopy;
         for (auto touch : *touches) {
@@ -346,7 +376,10 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     }
 
     void handleStandardHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
-        auto registeredPaths = this->getRegisteredPaths<CCStandardTouchHandler>(m_pStandardHandlers, std::nullopt);
+        std::vector<ParentPath<CCStandardTouchHandler>> invalidRoots;
+        auto registeredPaths = this->getRegisteredPaths<CCStandardTouchHandler>(m_pStandardHandlers, std::nullopt, invalidRoots);
+
+        if (index == CCTOUCHBEGAN) logInvalidRoots(invalidRoots);
 
         for (auto& path : registeredPaths) {
             auto delegate = path.handler->getDelegate();
@@ -419,10 +452,14 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
                 if (!handler) continue;
 
                 if (typeinfo_cast<CCTargetedTouchHandler*>(handler)) {
-                    m_pTargetedHandlers->addObject(handler);
+                    if (!m_pTargetedHandlers->containsObject(handler)) {
+                        m_pTargetedHandlers->addObject(handler);
+                    }
                 }
                 else {
-                    m_pStandardHandlers->addObject(handler);
+                    if (!m_pStandardHandlers->containsObject(handler)) {
+                        m_pStandardHandlers->addObject(handler);
+                    }
                 }
             }
 
@@ -437,7 +474,10 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
     }
 
     bool handleSingleTargetedHandlersWithFilter(CCTouch* touch, CCEvent* event, unsigned int index, CCNode* filter) {
-        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers, filter);
+        std::vector<ParentPath<CCTargetedTouchHandler>> invalidRoots;
+        auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers, filter, invalidRoots);
+
+        if (index == CCTOUCHBEGAN) logInvalidRoots(invalidRoots);
 
         return this->handleSingleTargetedHandlers(nullptr, touch, event, index, registeredPaths);
     }
