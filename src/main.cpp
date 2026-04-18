@@ -499,11 +499,12 @@ struct FuckEditorPrio : Modify<FuckEditorPrio, GJBaseGameLayer> {
 
 class ObjectLayerTouchListener: public CCLayer {
 public:
-    CCLayer* m_objectLayer;
+    std::vector<CCLayer*> m_objectLayers;
 
-    static ObjectLayerTouchListener* create(CCLayer* objectLayer) {
+    template<class... Layers>
+    static ObjectLayerTouchListener* create(Layers... layers) {
         auto ret = new ObjectLayerTouchListener;
-        if (ret->init(objectLayer)) {
+        if (ret->init(layers...)) {
             ret->autorelease();
             return ret;
         }
@@ -512,10 +513,11 @@ public:
         return nullptr;
     }
 
-    bool init(CCLayer* objectLayer) {
+    template<class... Layers>
+    bool init(Layers... layers) {
         if (!CCLayer::init()) return false;
 
-        m_objectLayer = objectLayer;
+        m_objectLayers = {layers...};
 
         this->setTouchEnabled(true);
         this->setID("object-layer-touch-listener"_spr);
@@ -527,20 +529,31 @@ public:
         CCTouchDispatcher::get()->addTargetedDelegate(this, 0, true);
     }
 
+    bool dispatchToLayers(CCTouch* touch, CCEvent* event, int type) {
+        auto dispatcher = static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get());
+        bool ret = false;
+        for (auto layer : m_objectLayers) {
+            if (dispatcher->handleSingleTargetedHandlersWithFilter(touch, event, type, layer)) {
+                ret = true;
+            }
+        }
+        return ret;
+    }
+
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
-        return static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHBEGAN, m_objectLayer);
+        return dispatchToLayers(touch, event, CCTOUCHBEGAN);
     }
 
     void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
-        static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHMOVED, m_objectLayer);
+        dispatchToLayers(touch, event, CCTOUCHMOVED);
     }
 
     void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
-        static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHENDED, m_objectLayer);
+        dispatchToLayers(touch, event, CCTOUCHENDED);
     }
 
     void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
-        static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get())->handleSingleTargetedHandlersWithFilter(touch, event, CCTOUCHCANCELLED, m_objectLayer);
+        dispatchToLayers(touch, event, CCTOUCHCANCELLED);
     }
 };
 
@@ -551,7 +564,7 @@ struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
         if (!EditorUI::init(editorLayer)) return false;
 
         // below everything else in editorui, but inside editorui so it runs before editorui's touches
-        this->addChild(ObjectLayerTouchListener::create(editorLayer->m_objectLayer), -1000); 
+        this->addChild(ObjectLayerTouchListener::create(editorLayer->m_objectLayer, editorLayer->m_inShaderObjectLayer), -1000); 
 
         return true;
     }
