@@ -531,13 +531,12 @@ public:
 
     bool dispatchToLayers(CCTouch* touch, CCEvent* event, int type) {
         auto dispatcher = static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get());
-        bool ret = false;
         for (auto layer : m_objectLayers) {
             if (dispatcher->handleSingleTargetedHandlersWithFilter(touch, event, type, layer)) {
-                ret = true;
+                return true;
             }
         }
-        return ret;
+        return false;
     }
 
     bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
