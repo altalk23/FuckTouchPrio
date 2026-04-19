@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.17
+ * Fix Editor touch breaking when shaders are active
+
 ## v1.0.16
  * Fix leak when touch is registered more than once on a node
  * Fix nodes with invalid roots still being checked
