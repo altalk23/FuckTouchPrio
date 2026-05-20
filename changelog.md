@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.19
+ * Rework EditorUI touch to instead be the dispatcher of delegates on the object layer instead of a separate node.
+
 ## v1.0.18
  * Actually fix editor touch breaking when shaders are active
 
