@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.18
+ * Actually fix editor touch breaking when shaders are active
+
 ## v1.0.17
  * Fix Editor touch breaking when shaders are active
 
