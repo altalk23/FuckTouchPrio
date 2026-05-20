@@ -563,7 +563,7 @@ struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
         if (!EditorUI::init(editorLayer)) return false;
 
         // below everything else in editorui, but inside editorui so it runs before editorui's touches
-        this->addChild(ObjectLayerTouchListener::create(editorLayer->m_objectLayer, editorLayer->m_inShaderObjectLayer), -1000); 
+        this->addChild(ObjectLayerTouchListener::create(editorLayer->m_inShaderObjectLayer, editorLayer->m_objectLayer), -1000); 
 
         return true;
     }

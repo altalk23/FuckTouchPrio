@@ -1,12 +1,12 @@
 {
-	"geode": "5.6.0",
+	"geode": "5.7.1",
 	"gd": {
 		"win": "2.2081",
 		"android": "2.2081",
 		"mac": "2.2081",
 		"ios": "2.2081"
 	},
-	"version": "v1.0.17",
+	"version": "v1.0.18",
 	"id": "alk.better-touch-prio",
 	"name": "Better Touch Prio",
 	"developer": "alk",
