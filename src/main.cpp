@@ -497,74 +497,59 @@ struct FuckEditorPrio : Modify<FuckEditorPrio, GJBaseGameLayer> {
     }
 };
 
-class ObjectLayerTouchListener: public CCLayer {
-public:
-    std::vector<CCLayer*> m_objectLayers;
+#include <Geode/modify/EditorUI.hpp>
+struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
+    struct Fields {
+        bool m_inObjectsLayer = false;
+    };
 
-    template<class... Layers>
-    static ObjectLayerTouchListener* create(Layers... layers) {
-        auto ret = new ObjectLayerTouchListener;
-        if (ret->init(layers...)) {
-            ret->autorelease();
-            return ret;
+    $override
+    bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
+        if (dispatchToLayers(touch, event, CCTOUCHBEGAN)) {
+            m_fields->m_inObjectsLayer = true;
+            return true;
         }
-
-        delete ret;
-        return nullptr;
+        return EditorUI::ccTouchBegan(touch, event);
     }
 
-    template<class... Layers>
-    bool init(Layers... layers) {
-        if (!CCLayer::init()) return false;
-
-        m_objectLayers = {layers...};
-
-        this->setTouchEnabled(true);
-        this->setID("object-layer-touch-listener"_spr);
-
-        return true;
+    $override
+    void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
+        if (m_fields->m_inObjectsLayer) {
+            dispatchToLayers(touch, event, CCTOUCHMOVED);
+            return;
+        }
+        EditorUI::ccTouchMoved(touch, event);
     }
 
-    void registerWithTouchDispatcher() override {
-        CCTouchDispatcher::get()->addTargetedDelegate(this, 0, true);
+    $override
+    void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
+        auto fields = m_fields.self();
+        if (fields->m_inObjectsLayer) {
+            dispatchToLayers(touch, event, CCTOUCHENDED);
+            fields->m_inObjectsLayer = false;
+            return;
+        }
+        EditorUI::ccTouchEnded(touch, event);
+    }
+
+    $override
+    void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
+        auto fields = m_fields.self();
+        if (fields->m_inObjectsLayer) {
+            dispatchToLayers(touch, event, CCTOUCHCANCELLED);
+            fields->m_inObjectsLayer = false;
+            return;
+        }
+        EditorUI::ccTouchCancelled(touch, event);
     }
 
     bool dispatchToLayers(CCTouch* touch, CCEvent* event, int type) {
         auto dispatcher = static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get());
-        for (auto layer : m_objectLayers) {
+        for (auto layer : {m_editorLayer->m_inShaderObjectLayer, m_editorLayer->m_objectLayer}) {
             if (dispatcher->handleSingleTargetedHandlersWithFilter(touch, event, type, layer)) {
                 return true;
             }
         }
         return false;
-    }
-
-    bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
-        return dispatchToLayers(touch, event, CCTOUCHBEGAN);
-    }
-
-    void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
-        dispatchToLayers(touch, event, CCTOUCHMOVED);
-    }
-
-    void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
-        dispatchToLayers(touch, event, CCTOUCHENDED);
-    }
-
-    void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
-        dispatchToLayers(touch, event, CCTOUCHCANCELLED);
-    }
-};
-
-#include <Geode/modify/EditorUI.hpp>
-struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
-    $override
-    bool init(LevelEditorLayer* editorLayer) {
-        if (!EditorUI::init(editorLayer)) return false;
-
-        // below everything else in editorui, but inside editorui so it runs before editorui's touches
-        this->addChild(ObjectLayerTouchListener::create(editorLayer->m_inShaderObjectLayer, editorLayer->m_objectLayer), -1000); 
-
-        return true;
     }
 };
