@@ -545,7 +545,7 @@ struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
 
     bool dispatchToLayers(CCTouch* touch, CCEvent* event, int type) {
         auto dispatcher = static_cast<FuckTouchDispatcher*>(CCTouchDispatcher::get());
-        for (auto layer : {m_editorLayer->m_inShaderObjectLayer, m_editorLayer->m_objectLayer}) {
+        for (auto layer : {m_editorLayer->m_inShaderObjectLayer, m_editorLayer->m_aboveShaderObjectLayer, m_editorLayer->m_objectLayer}) {
             if (dispatcher->handleSingleTargetedHandlersWithFilter(touch, event, type, layer)) {
                 return true;
             }
