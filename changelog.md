@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.20
+ * Include second layer that can contain controls when you have shaders above BG but not including it
+
 ## v1.0.19
  * Rework EditorUI touch to instead be the dispatcher of delegates on the object layer instead of a separate node.
 
