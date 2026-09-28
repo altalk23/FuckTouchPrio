@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.21
+ * Fix a bug that could cause invalid handlers to stay in the touch dispatcher
+ * Fix a bug that could cause some crashes on iOS
+
 ## v1.0.20
  * Include second layer that can contain controls when you have shaders above BG but not including it
 

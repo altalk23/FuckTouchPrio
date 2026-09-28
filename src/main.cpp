@@ -361,6 +361,8 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
 
     void handleTargetedHandlers(CCSet* touches, CCEvent* event, unsigned int index, std::optional<CCNode*> filter = std::nullopt) {
         std::vector<ParentPath<CCTargetedTouchHandler>> invalidRoots;
+        Ref<CCArray> handlersCopy = m_pTargetedHandlers->shallowCopy();
+
         auto registeredPaths = this->getRegisteredPaths<CCTargetedTouchHandler>(m_pTargetedHandlers, filter, invalidRoots);
 
         if (index == CCTOUCHBEGAN) logInvalidRoots(invalidRoots);
@@ -377,6 +379,8 @@ struct FuckTouchDispatcher : Modify<FuckTouchDispatcher, CCTouchDispatcher> {
 
     void handleStandardHandlers(CCSet* touches, CCEvent* event, unsigned int index) {
         std::vector<ParentPath<CCStandardTouchHandler>> invalidRoots;
+        Ref<CCArray> handlersCopy = m_pStandardHandlers->shallowCopy();
+
         auto registeredPaths = this->getRegisteredPaths<CCStandardTouchHandler>(m_pStandardHandlers, std::nullopt, invalidRoots);
 
         if (index == CCTOUCHBEGAN) logInvalidRoots(invalidRoots);
@@ -530,17 +534,6 @@ struct FuckEditorUI : Modify<FuckEditorUI, EditorUI> {
             return;
         }
         EditorUI::ccTouchEnded(touch, event);
-    }
-
-    $override
-    void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
-        auto fields = m_fields.self();
-        if (fields->m_inObjectsLayer) {
-            dispatchToLayers(touch, event, CCTOUCHCANCELLED);
-            fields->m_inObjectsLayer = false;
-            return;
-        }
-        EditorUI::ccTouchCancelled(touch, event);
     }
 
     bool dispatchToLayers(CCTouch* touch, CCEvent* event, int type) {
